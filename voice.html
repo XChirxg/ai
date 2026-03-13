@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StoryVoice — AI Narration Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0c0a;
+    --surface: #161412;
+    --surface2: #1e1b18;
+    --border: #2a2520;
+    --gold: #c9a84c;
+    --gold-dim: #7a6228;
+    --text: #e8e0d4;
+    --text-dim: #7a7068;
+    --text-mid: #b0a898;
+    --green: #4caf7a;
+    --red: #e05a5a;
+    --amber: #d4894a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 24px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(14,12,10,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--gold);
+    letter-spacing: 0.02em;
+  }
+
+  .logo span {
+    color: var(--text-dim);
+    font-style: italic;
+    font-size: 13px;
+    margin-left: 10px;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 100px;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s;
+  }
+
+  .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .status-dot.error { background: var(--red); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 48px 80px;
+  }
+
+  /* STEP SECTIONS */
+  .step {
+    margin-bottom: 40px;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .step:nth-child(2) { animation-delay: 0.1s; }
+  .step:nth-child(3) { animation-delay: 0.2s; }
+  .step:nth-child(4) { animation-delay: 0.3s; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .step-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .step-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    color: var(--text);
+  }
+
+  .step-desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-left: 48px;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+
+  /* NGROK INPUT */
+  .ngrok-row {
+    display: flex;
+    gap: 12px;
+    margin-left: 48px;
+  }
+
+  .ngrok-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .ngrok-input:focus { border-color: var(--gold-dim); }
+  .ngrok-input::placeholder { color: var(--text-dim); }
+
+  .btn {
+    padding: 12px 22px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-gold {
+    background: var(--gold);
+    color: #0e0c0a;
+  }
+  .btn-gold:hover { background: #d4b060; transform: translateY(-1px); }
+  .btn-gold:active { transform: translateY(0); }
+  .btn-gold:disabled { background: var(--gold-dim); cursor: not-allowed; transform: none; }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+  }
+  .btn-outline:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+  /* TEMPLATE SECTION */
+  .template-box {
+    margin-left: 48px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .template-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .template-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .template-content {
+    padding: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.8;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .template-content .key { color: var(--gold); }
+  .template-content .val { color: #7ec8a0; }
+  .template-content .comment { color: var(--text-dim); }
+
+  /* STORY EDITOR */
+  .story-editor-wrap {
+    margin-left: 48px;
+  }
+
+  .lines-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .story-line {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .story-line:focus-within { border-color: var(--gold-dim); }
+
+  .line-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .line-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .line-remove {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 4px;
+    transition: color 0.2s;
+  }
+  .line-remove:hover { color: var(--red); }
+
+  .line-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  .line-field {
+    padding: 10px 14px;
+  }
+
+  .line-field:first-child {
+    border-right: 1px solid var(--border);
+  }
+
+  .line-field label {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .line-field textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    resize: none;
+    line-height: 1.5;
+    min-height: 46px;
+  }
+
+  .line-field textarea::placeholder { color: var(--text-dim); }
+
+  .editor-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* PASTE JSON AREA */
+  .paste-section {
+    margin-left: 48px;
+  }
+
+  .paste-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .paste-area {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 16px;
+    resize: vertical;
+    min-height: 160px;
+    outline: none;
+    line-height: 1.7;
+    transition: border-color 0.2s;
+  }
+
+  .paste-area:focus { border-color: var(--gold-dim); }
+  .paste-area::placeholder { color: var(--text-dim); }
+
+  /* GENERATE SECTION */
+  .generate-section {
+    margin-left: 48px;
+  }
+
+  .generate-btn-wrap {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .btn-generate {
+    padding: 14px 36px;
+    background: var(--gold);
+    color: #0e0c0a;
+    border: none;
+    border-radius: 10px;
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn-generate:hover { background: #d4b060; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,168,76,0.2); }
+  .btn-generate:disabled { background: var(--gold-dim); cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #0e0c0a;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: none;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* LOG */
+  .log-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: none;
+  }
+
+  .log-header {
+    padding: 10px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .log-content {
+    padding: 14px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-mid);
+    max-height: 200px;
+    overflow-y: auto;
+    line-height: 1.8;
+  }
+
+  .log-line { display: block; }
+  .log-line.ok { color: var(--green); }
+  .log-line.err { color: var(--red); }
+  .log-line.info { color: var(--gold); }
+
+  /* AUDIO RESULT */
+  .audio-result {
+    margin-top: 20px;
+    background: var(--surface);
+    border: 1px solid var(--gold-dim);
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: none;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .audio-result.visible { display: flex; animation: fadeUp 0.4s ease; }
+
+  .audio-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+
+  .audio-info { flex: 1; }
+
+  .audio-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+
+  .audio-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+  }
+
+  audio {
+    width: 100%;
+    margin-top: 10px;
+    filter: invert(1) hue-rotate(180deg);
+    border-radius: 4px;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    z-index: 9999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  @media (max-width: 700px) {
+    .header { padding: 16px 20px; }
+    .main { padding: 28px 20px 60px; }
+    .step-header { gap: 10px; }
+    .step-num { width: 26px; height: 26px; font-size: 11px; }
+    .step-title { font-size: 17px; }
+    .step-desc, .ngrok-row, .template-box, .story-editor-wrap, .paste-section, .generate-section { margin-left: 0; }
+    .line-inputs { grid-template-columns: 1fr; }
+    .line-field:first-child { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">StoryVoice <span>AI Narration Studio</span></div>
+  <div class="status-pill">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">not connected</span>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- STEP 1: Connect -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">Connect to Colab</div>
+    </div>
+    <p class="step-desc">Run all cells in your Colab notebook. Copy the ngrok URL printed at the end and paste it below.</p>
+    <div class="ngrok-row">
+      <input class="ngrok-input" id="ngrokUrl" type="text" placeholder="https://xxxx-xx-xx-xxx-xx.ngrok-free.app" />
+      <button class="btn btn-gold" onclick="connectColab()">Connect</button>
+    </div>
+    <p style="margin-left:48px; margin-top:10px; font-size:12px; color:var(--text-dim); font-family:'DM Mono',monospace;" id="connectMsg"></p>
+  </div>
+
+  <hr class="divider">
+
+  <!-- STEP 2: Get story template -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">Get Story Template</div>
+    </div>
+    <p class="step-desc">Copy this template, paste it into ChatGPT / Claude / Gemini, and ask it to fill in your story. Then paste the result back in Step 3.</p>
+    <div class="template-box">
+      <div class="template-toolbar">
+        <span class="template-label">prompt template — copy & send to any LLM</span>
+        <button class="btn btn-outline" style="font-size:12px; padding:6px 14px;" onclick="copyTemplate()">Copy</button>
+      </div>
+      <div class="template-content" id="templateContent"></div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- STEP 3: Enter story -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-title">Enter Your Story</div>
+    </div>
+    <p class="step-desc">Either paste the JSON returned by the LLM below, or fill in lines manually using the editor.</p>
+
+    <div class="paste-section" style="margin-bottom:16px;">
+      <div class="paste-label">// paste LLM response here (JSON array)</div>
+      <textarea class="paste-area" id="jsonPaste" placeholder='[
+  { "text": "You stand at the edge of a vast desert.", "instruct": "Slow, calm, mysterious." },
+  { "text": "The wind carries whispers of an ancient past.", "instruct": "Soft and wonder-filled." }
+]' oninput="parseJsonPaste()"></textarea>
+    </div>
+
+    <div class="story-editor-wrap">
+      <div class="lines-container" id="linesContainer"></div>
+      <div class="editor-actions">
+        <button class="btn btn-outline" onclick="addLine()">+ Add Line</button>
+        <button class="btn btn-outline" onclick="clearLines()">Clear All</button>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- STEP 4: Generate -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div class="step-title">Generate Audio</div>
+    </div>
+    <p class="step-desc">Send your story to Colab and get back a narrated audio file in your voice.</p>
+    <div class="generate-section">
+      <div class="generate-btn-wrap">
+        <button class="btn-generate" id="generateBtn" onclick="generateAudio()">
+          <div class="spinner" id="spinner"></div>
+          <span id="generateLabel">✦ Generate Narration</span>
+        </button>
+        <span style="font-size:12px; color:var(--text-dim); font-family:'DM Mono',monospace;" id="lineCount"></span>
+      </div>
+      <div class="log-box" id="logBox">
+        <div class="log-header">generation log</div>
+        <div class="log-content" id="logContent"></div>
+      </div>
+      <div class="audio-result" id="audioResult">
+        <div class="audio-icon">🎙️</div>
+        <div class="audio-info">
+          <div class="audio-title">Your Story Narration</div>
+          <div class="audio-meta" id="audioMeta">Ready to play</div>
+          <audio controls id="audioPlayer"></audio>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let colabUrl = '';
+let storyLines = [];
+
+// ─── Template ───────────────────────────────────────────
+const templateText = `Write a story in the following JSON format.
+Return ONLY the JSON array, nothing else, no explanation.
+
+[
+  {
+    "text": "The sentence to be spoken aloud.",
+    "instruct": "How to deliver it — tone, pace, emotion."
+  },
+  ...more lines...
+]
+
+Story requirements:
+- 2nd person perspective (use "you")
+- 10–15 lines total
+- Each line is 1–2 sentences max
+- instruct should describe: tone (calm/tense/joyful), pace (slow/fast), emotion, and any pauses
+
+Theme: [REPLACE WITH YOUR THEME — e.g. "enchanted forest journey", "space exploration", "ancient mystery"]
+Style: cinematic, immersive, storytelling`;
+
+document.getElementById('templateContent').innerHTML =
+  templateText
+    .replace(/(\[.*?\])/g, '<span class="key">$1</span>')
+    .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
+    .replace(/: "([^"]+)"/g, ': <span class="val">"$1"</span>')
+    .replace(/(\/\/.*)/g, '<span class="comment">$1</span>');
+
+function copyTemplate() {
+  navigator.clipboard.writeText(templateText);
+  showToast('Template copied!');
+}
+
+// ─── Connect ────────────────────────────────────────────
+async function connectColab() {
+  let url = document.getElementById('ngrokUrl').value.trim().replace(/\/$/, '');
+  if (!url) { showToast('Paste your ngrok URL first'); return; }
+  colabUrl = url;
+  const msg = document.getElementById('connectMsg');
+  msg.textContent = 'Connecting...';
+  try {
+    const res = await fetch(`${colabUrl}/health`, { signal: AbortSignal.timeout(8000), headers: { 'ngrok-skip-browser-warning': 'true' } });
+    const data = await res.json();
+    if (data.status === 'running') {
+      setStatus('connected', 'connected');
+      msg.textContent = '✓ Connected successfully';
+      msg.style.color = 'var(--green)';
+      showToast('Connected to Colab!');
+    }
+  } catch (e) {
+    setStatus('error', 'connection failed');
+    msg.textContent = '✗ Could not connect — make sure Colab is running';
+    msg.style.color = 'var(--red)';
+  }
+}
+
+function setStatus(type, text) {
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('statusText');
+  dot.className = 'status-dot ' + type;
+  label.textContent = text;
+}
+
+// ─── Story Lines Editor ──────────────────────────────────
+function addLine(text = '', instruct = '') {
+  storyLines.push({ text, instruct });
+  renderLines();
+  updateLineCount();
+}
+
+function removeLine(i) {
+  storyLines.splice(i, 1);
+  renderLines();
+  updateLineCount();
+}
+
+function clearLines() {
+  storyLines = [];
+  renderLines();
+  updateLineCount();
+  document.getElementById('jsonPaste').value = '';
+}
+
+function renderLines() {
+  const container = document.getElementById('linesContainer');
+  container.innerHTML = '';
+  storyLines.forEach((line, i) => {
+    container.innerHTML += `
+    <div class="story-line" id="line-${i}">
+      <div class="line-header">
+        <span class="line-num">Line ${i + 1}</span>
+        <button class="line-remove" onclick="removeLine(${i})">×</button>
+      </div>
+      <div class="line-inputs">
+        <div class="line-field">
+          <label>Text (spoken)</label>
+          <textarea placeholder="What should be spoken..." oninput="storyLines[${i}].text=this.value">${line.text}</textarea>
+        </div>
+        <div class="line-field">
+          <label>Instruct (tone / delivery)</label>
+          <textarea placeholder="Slow, calm, mysterious..." oninput="storyLines[${i}].instruct=this.value">${line.instruct}</textarea>
+        </div>
+      </div>
+    </div>`;
+  });
+}
+
+function updateLineCount() {
+  const el = document.getElementById('lineCount');
+  el.textContent = storyLines.length > 0 ? `${storyLines.length} line${storyLines.length > 1 ? 's' : ''}` : '';
+}
+
+function parseJsonPaste() {
+  const raw = document.getElementById('jsonPaste').value.trim();
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      storyLines = parsed.map(p => ({ text: p.text || '', instruct: p.instruct || '' }));
+      renderLines();
+      updateLineCount();
+      showToast(`Loaded ${storyLines.length} lines from JSON`);
+    }
+  } catch (e) {
+    // still typing, ignore
+  }
+}
+
+// start with 3 empty lines
+addLine(); addLine(); addLine();
+
+// ─── Generate ────────────────────────────────────────────
+async function generateAudio() {
+  if (!colabUrl) { showToast('Connect to Colab first (Step 1)'); return; }
+  const lines = storyLines.filter(l => l.text.trim());
+  if (lines.length === 0) { showToast('Add some story lines first'); return; }
+
+  const btn = document.getElementById('generateBtn');
+  const spinner = document.getElementById('spinner');
+  const label = document.getElementById('generateLabel');
+  const logBox = document.getElementById('logBox');
+  const logContent = document.getElementById('logContent');
+  const audioResult = document.getElementById('audioResult');
+
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  label.textContent = 'Generating...';
+  logBox.style.display = 'block';
+  audioResult.classList.remove('visible');
+  logContent.innerHTML = '';
+
+  log(`Sending ${lines.length} lines to Colab...`, 'info');
+  log(`Connected: ${colabUrl}`, 'info');
+
+  try {
+    const startTime = Date.now();
+    const res = await fetch(`${colabUrl}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+      body: JSON.stringify({ story: lines }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Generation failed');
+    }
+
+    const blob = await res.blob();
+    const audioUrl = URL.createObjectURL(blob);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    log(`Done in ${duration}s`, 'ok');
+    log('Audio ready ✓', 'ok');
+
+    document.getElementById('audioPlayer').src = audioUrl;
+    document.getElementById('audioMeta').textContent = `${lines.length} lines · generated in ${duration}s`;
+    audioResult.classList.add('visible');
+    showToast('Audio ready!');
+
+  } catch (e) {
+    log(`Error: ${e.message}`, 'err');
+    showToast('Generation failed — check Colab is running');
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    label.textContent = '✦ Generate Narration';
+  }
+}
+
+function log(msg, type = '') {
+  const el = document.getElementById('logContent');
+  el.innerHTML += `<span class="log-line ${type}">> ${msg}</span>\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ─── Toast ───────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
