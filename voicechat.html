@@ -275,6 +275,56 @@ body::before {
 .setup-msg.ok { color: var(--green); }
 .setup-msg.err { color: var(--red); }
 
+/* Mode toggle */
+.mode-toggle {
+  display: flex;
+  gap: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.mode-btn {
+  flex: 1;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.mode-btn.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+.mode-btn.active.voice-mode { color: var(--accent); }
+.mode-btn.active.text-mode  { color: var(--amber); }
+.mode-btn:first-child { border-right: 1px solid var(--border2); }
+
+.voice-section { transition: opacity 0.25s, max-height 0.3s; overflow: hidden; max-height: 600px; }
+.voice-section.collapsed { max-height: 0; opacity: 0; pointer-events: none; margin: 0; }
+
+.text-only-note {
+  display: none;
+  background: rgba(255,179,71,0.06);
+  border: 1px solid rgba(255,179,71,0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--amber);
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+.text-only-note.show { display: block; }
+
 /* ── CHAT SCREEN ──────────────────────────────────────────*/
 .chat-wrap {
   display: flex;
@@ -637,6 +687,12 @@ body::before {
   gap: 5px;
   color: var(--green);
 }
+.voice-off-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--amber);
+}
 
 /* ── TOAST ────────────────────────────────────────────────*/
 .toast {
@@ -668,35 +724,54 @@ body::before {
     <div class="setup-logo">VoiceChat</div>
     <div class="setup-tagline">// messages that actually speak</div>
 
+    <!-- Mode toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn voice-mode active" id="modeVoiceBtn" onclick="setMode('voice')">
+        🎙 Voice Mode
+      </button>
+      <button class="mode-btn text-mode" id="modeTextBtn" onclick="setMode('text')">
+        💬 Text Only
+      </button>
+    </div>
+
     <div class="setup-label">Your display name</div>
     <input type="text" class="setup-input" id="userName" placeholder="e.g. Chirag" maxlength="20">
 
     <div class="setup-label">Room ID <span style="color:var(--text-dim);font-size:10px;">(share with the other person)</span></div>
     <input type="text" class="setup-input" id="roomId" placeholder="e.g. chirag-priya-room" maxlength="40">
 
-    <div class="setup-label">Your Colab ngrok URL</div>
-    <input type="text" class="setup-input" id="ngrokUrl" placeholder="https://xxxx.ngrok-free.app">
+    <!-- Voice-only section -->
+    <div class="voice-section" id="voiceSection">
+      <div class="setup-label">Your Colab ngrok URL</div>
+      <input type="text" class="setup-input" id="ngrokUrl" placeholder="https://xxxx.ngrok-free.app">
 
-    <div class="setup-divider"></div>
+      <div class="setup-divider"></div>
 
-    <!-- Record voice sample -->
-    <div class="record-zone">
-      <div class="rec-controls">
-        <button class="rec-btn" id="recBtn" onclick="toggleRecord()">
-          <div class="rec-dot"></div>
-        </button>
-        <div class="rec-info">
-          <div class="rec-title">Record your voice sample</div>
-          <div class="rec-sub" id="recSub">5–20 seconds of natural speech</div>
+      <!-- Record voice sample -->
+      <div class="record-zone">
+        <div class="rec-controls">
+          <button class="rec-btn" id="recBtn" onclick="toggleRecord()">
+            <div class="rec-dot"></div>
+          </button>
+          <div class="rec-info">
+            <div class="rec-title">Record your voice sample</div>
+            <div class="rec-sub" id="recSub">5–20 seconds of natural speech</div>
+          </div>
         </div>
-      </div>
-      <div class="waveform" id="waveform">
-        <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-      </div>
-      <audio class="mini-audio-preview" id="audioPreview" controls></audio>
+        <div class="waveform" id="waveform">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <audio class="mini-audio-preview" id="audioPreview" controls></audio>
 
-      <div class="ngrok-label">// transcript — what you just said</div>
-      <textarea class="ref-input" id="refText" placeholder="Type exactly what you said in the recording above…" rows="2"></textarea>
+        <div class="ngrok-label">// transcript — what you just said</div>
+        <textarea class="ref-input" id="refText" placeholder="Type exactly what you said in the recording above…" rows="2"></textarea>
+      </div>
+    </div>
+
+    <!-- Text-only note -->
+    <div class="text-only-note" id="textOnlyNote">
+      ⚡ Text-only mode — you can chat instantly without Colab or voice setup.<br>
+      Messages from voice users will still play their cloned voice for you.
     </div>
 
     <button class="setup-btn" id="setupBtn" onclick="doSetup()">Enter Chat</button>
@@ -717,12 +792,12 @@ body::before {
       </div>
     </div>
     <div class="my-badge">
-      <span>🎙</span>
+      <span id="myModeIcon">🎙</span>
       <span id="myNameBadge">—</span>
     </div>
-    <div class="voice-indicator">
+    <div class="voice-indicator" id="voiceIndicator">
       <div class="vi-dot"></div>
-      <span>voice on</span>
+      <span id="voiceIndicatorText">voice on</span>
     </div>
   </div>
 
@@ -751,7 +826,7 @@ body::before {
     </div>
     <div class="input-hint">
       <span>Enter to send · Shift+Enter for newline</span>
-      <span class="voice-active-badge">● voice active</span>
+      <span class="voice-active-badge" id="voiceHintBadge">● voice active</span>
     </div>
   </div>
 </div>
@@ -768,6 +843,7 @@ const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 let myName     = '';
 let myRoom     = '';
 let myNgrok    = '';
+let myMode     = 'voice';  // 'voice' | 'text'
 let speakerId  = '';   // unique per user session
 let voiceBlob  = null;
 let voiceCloned = false;
@@ -777,7 +853,31 @@ let isTyping     = false;
 let audioCache   = {};  // messageId -> audioBlob
 let mediaRecorder, recChunks = [], isRecording = false, recSecs = 0, recTimer;
 
-// ── RECORDING ───────────────────────────────────────────────
+// ── MODE TOGGLE ─────────────────────────────────────────────
+function setMode(mode) {
+  myMode = mode;
+  const voiceSection = document.getElementById('voiceSection');
+  const textNote     = document.getElementById('textOnlyNote');
+  const voiceBtn     = document.getElementById('modeVoiceBtn');
+  const textBtn      = document.getElementById('modeTextBtn');
+  const setupBtn     = document.getElementById('setupBtn');
+
+  if (mode === 'voice') {
+    voiceSection.classList.remove('collapsed');
+    textNote.classList.remove('show');
+    voiceBtn.classList.add('active');
+    textBtn.classList.remove('active');
+    setupBtn.textContent = 'Enter Chat with Voice';
+  } else {
+    voiceSection.classList.add('collapsed');
+    textNote.classList.add('show');
+    textBtn.classList.add('active');
+    voiceBtn.classList.remove('active');
+    setupBtn.textContent = 'Enter Chat (Text Only)';
+  }
+}
+
+// ── RECORDING ─────────────────────────────────────────────
 async function toggleRecord() {
   if (!isRecording) {
     try {
@@ -828,21 +928,34 @@ function blobToBase64(blob) {
 async function doSetup() {
   const name    = document.getElementById('userName').value.trim();
   const room    = document.getElementById('roomId').value.trim().replace(/\s+/g, '-');
-  const ngrok   = document.getElementById('ngrokUrl').value.trim().replace(/\/$/, '');
-  const refText = document.getElementById('refText').value.trim();
-  const msg     = document.getElementById('setupMsg');
   const btn     = document.getElementById('setupBtn');
 
-  if (!name)    { setMsg('Enter your display name', 'err'); return; }
-  if (!room)    { setMsg('Enter a room ID', 'err'); return; }
-  if (!ngrok)   { setMsg('Enter your ngrok URL', 'err'); return; }
+  if (!name) { setMsg('Enter your display name', 'err'); return; }
+  if (!room) { setMsg('Enter a room ID', 'err'); return; }
+
+  // ── TEXT ONLY MODE ──────────────────────────────────────
+  if (myMode === 'text') {
+    myName  = name;
+    myRoom  = room;
+    myNgrok = '';
+    speakerId = '';
+    voiceCloned = false;
+    setMsg('Joining room…', '');
+    enterChat();
+    return;
+  }
+
+  // ── VOICE MODE ──────────────────────────────────────────
+  const ngrok   = document.getElementById('ngrokUrl').value.trim().replace(/\/$/, '');
+  const refText = document.getElementById('refText').value.trim();
+
+  if (!ngrok)     { setMsg('Enter your ngrok URL', 'err'); return; }
   if (!voiceBlob) { setMsg('Record a voice sample first', 'err'); return; }
-  if (!refText) { setMsg('Add the transcript of your recording', 'err'); return; }
+  if (!refText)   { setMsg('Add the transcript of your recording', 'err'); return; }
 
   btn.disabled = true;
   setMsg('Connecting to Colab…', '');
 
-  // Health check
   try {
     const h = await fetch(`${ngrok}/health`, { headers: { 'ngrok-skip-browser-warning': 'true' }, signal: AbortSignal.timeout(7000) });
     const hd = await h.json();
@@ -851,7 +964,6 @@ async function doSetup() {
 
   setMsg('Cloning your voice…', '');
 
-  // Clone voice
   try {
     speakerId = name.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
     const b64 = await blobToBase64(voiceBlob);
@@ -869,7 +981,6 @@ async function doSetup() {
   myRoom  = room;
   myNgrok = ngrok;
 
-  // Ensure the messages table exists (silently try to create via insert dummy read)
   setMsg('Joining room…', '');
   enterChat();
 }
@@ -902,7 +1013,24 @@ async function enterChat() {
   }
 
   scrollBottom();
-  document.getElementById('headerStatus').textContent = 'live · voice enabled';
+  document.getElementById('headerStatus').textContent = voiceCloned ? 'live · voice enabled' : 'live · text only';
+  document.getElementById('myModeIcon').textContent = voiceCloned ? '🎙' : '💬';
+
+  const vi = document.getElementById('voiceIndicator');
+  const viText = document.getElementById('voiceIndicatorText');
+  const hint = document.getElementById('voiceHintBadge');
+  if (voiceCloned) {
+    vi.style.borderColor = '';
+    viText.textContent = 'voice on';
+    hint.className = 'voice-active-badge';
+    hint.textContent = '● voice active';
+  } else {
+    vi.style.borderColor = 'rgba(255,179,71,0.3)';
+    vi.style.color = 'var(--amber)';
+    viText.textContent = 'text only';
+    hint.className = 'voice-off-badge';
+    hint.textContent = '◌ text only';
+  }
 
   // Subscribe to new messages
   subscription = supa
@@ -929,7 +1057,7 @@ async function enterChat() {
     .subscribe();
 
   document.getElementById('msgInput').focus();
-  showToast('Voice cloned · chat ready 🎙️');
+  showToast(voiceCloned ? 'Voice cloned · chat ready 🎙️' : 'Joined as text-only user 💬');
 }
 
 // ── SEND MESSAGE ────────────────────────────────────────────
@@ -945,8 +1073,8 @@ async function sendMessage() {
   const msgObj = {
     room: myRoom,
     sender_name: myName,
-    speaker_id: speakerId,
-    ngrok_url: myNgrok,
+    speaker_id: speakerId || '',
+    ngrok_url: myNgrok || '',
     text: text,
     created_at: new Date().toISOString()
   };
@@ -1038,6 +1166,12 @@ function renderMessage(msg, incoming = false, isMine = false) {
 
 // ── MY OWN TTS (from my Colab) ──────────────────────────────
 async function generateMyVoice(msg, id) {
+  // Skip if this user is in text-only mode
+  if (!myNgrok || !speakerId) {
+    const el = document.getElementById('voice-' + id);
+    if (el) el.innerHTML = '';
+    return;
+  }
   try {
     const res = await fetch(`${myNgrok}/speak`, {
       method: 'POST',
@@ -1061,7 +1195,12 @@ async function generateMyVoice(msg, id) {
 // ── INCOMING VOICE (from their Colab) ──────────────────────
 async function fetchAndPlayVoice(msg) {
   const id = msg.id;
-  if (!msg.ngrok_url || !msg.speaker_id) return;
+  // If sender has no voice (text-only user), show nothing
+  if (!msg.ngrok_url || !msg.speaker_id) {
+    const el = document.getElementById('voice-' + id);
+    if (el) el.innerHTML = '';
+    return;
+  }
 
   try {
     const res = await fetch(`${msg.ngrok_url}/speak`, {
